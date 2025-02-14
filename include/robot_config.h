@@ -33,5 +33,7 @@ extern motor intake_motor;
 
 extern motor chain_motor;
 
+extern optical Optical;
+
 
 

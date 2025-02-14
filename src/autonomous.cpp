@@ -8,12 +8,12 @@ bool enableAutonDrive = true;
 void set_auton(){
     inertial_heading.calibrate();
     while(inertial_heading.isCalibrating()){
-        vex::task::sleep(2000);
+        vex::task::sleep(20);
     }
+
     
 
 }
-
 void turn_to_angle(float target_angle, float speed, float AcceptableError){
     double kP = 0.25; //for error  
     double kI = 0.09;   // for integral
@@ -33,7 +33,7 @@ void turn_to_angle(float target_angle, float speed, float AcceptableError){
 
     int RightMotor_turnspeed = 0;
     int LeftMotor_turnspeed = 0;
-    inertial_heading.resetHeading();// resets the heading of the Inertial Sensor to 0.
+    inertial_heading.setHeading(0, degrees);// resets the heading of the Inertial Sensor to 0.
 
 
     while (true){   
@@ -72,10 +72,14 @@ void turn_to_angle(float target_angle, float speed, float AcceptableError){
 
         prevError = angular_error;
 
-        RightMotor_turnspeed = speed - (P_Value + D_Value + I_Value);
+        RightMotor_turnspeed = (P_Value + D_Value + I_Value);
 
-        LeftMotor_turnspeed = speed + (P_Value + D_Value + I_Value);
+        LeftMotor_turnspeed = -(P_Value + D_Value + I_Value);
 
+        if (RightMotor_turnspeed > speed) RightMotor_turnspeed = speed;
+        if (RightMotor_turnspeed < -speed) RightMotor_turnspeed = -speed;
+        if (LeftMotor_turnspeed > speed) LeftMotor_turnspeed = speed;
+        if (LeftMotor_turnspeed < -speed) LeftMotor_turnspeed = -speed;
 
         Brain.Screen.clearScreen();
         Brain.Screen.setCursor(1, 1);
@@ -99,6 +103,7 @@ void turn_to_angle(float target_angle, float speed, float AcceptableError){
         if (fabs(angular_error) < AcceptableError){
             left_drive.stop();
             right_drive.stop();
+            vex::task::sleep(1000);
 
             break;
         }
@@ -110,14 +115,13 @@ void turn_to_angle(float target_angle, float speed, float AcceptableError){
     }
 } 
 
-
 // /// clockwise = positive, cc = negative
 
 void drive_distance(float target_distance, float speed, float AcceptableError) {
     // PID Constants
-    double kP = 0.5;
-    double kI = 0.03;   // Integral gain
-    double kD = 0.0;     // Derivative gain
+    double kP = 0.15;
+    double kI = 0.00000000000000000000000000001;   // Integral gain
+    double kD = 0.1;     // Derivative gain
 
     float P_Value = 0;
     float I_Value = 0;
@@ -127,10 +131,10 @@ void drive_distance(float target_distance, float speed, float AcceptableError) {
     float I_Limit = 50;  // Prevent integral windup
 
     // Reset motor encoders
-    left_drive.setPosition(0, degrees);
-    right_drive.setPosition(0, degrees);
+    left_front.setPosition(0, degrees);
+    right_front.resetPosition();
 
-    float LoopTime = 0.02;  // 20ms loop time
+    float LoopTime = 0.5;  // 20ms loop time
 
     float lateral_error = 0;
     float RightMotor_turnspeed = 0;
@@ -142,21 +146,24 @@ void drive_distance(float target_distance, float speed, float AcceptableError) {
 
     while (true) {
         // Get motor positions
-        LeftMotorPosition = left_drive.position(degrees);
-        RightMotorPosition = right_drive.position(degrees);
+        LeftMotorPosition = left_drive.position(degrees)*6;
+        RightMotorPosition = right_front.position(degrees)*6;
 
         // Calculate average position
-        avgPosition = (LeftMotorPosition + RightMotorPosition);
+        avgPosition = (LeftMotorPosition + RightMotorPosition)/2;
         lateral_error = target_distance - avgPosition;
 
-        //printf("lateral_error: %f\n", lateral_error);
-        //printf("avgPosition: %f\n", avgPosition);
-        printf("RightPosition: %f\n", RightMotorPosition);
+        printf("lateral_error: %f\n", lateral_error);
+        // printf("avgPosition: %f\n", avgPosition);
+        // printf("RightPosition: %f\n", RightMotorPosition);
+        //printf("LeftPosition: %f\n", LeftMotorPosition);
+        //printf("RightMotor_turnspeed: %f\n", RightMotor_turnspeed);
         
 
         // PID Calculations
         P_Value = lateral_error * kP;
         I_Value += (kI * lateral_error * LoopTime);
+        D_Value = kD * ((lateral_error - prevError) / LoopTime);
 
         // Prevent integral windup
         if (fabs(lateral_error) < AcceptableError) {
@@ -166,12 +173,11 @@ void drive_distance(float target_distance, float speed, float AcceptableError) {
         } else if (I_Value < -I_Limit) {
             I_Value = -I_Limit;
         }
-
-        D_Value = kD * ((lateral_error - prevError) / LoopTime);
+        float ScaleFactor = 0.8;
 
         // Compute motor speeds (PID directly controls speed)
-        LeftMotor_turnspeed = P_Value + I_Value + D_Value;
-        RightMotor_turnspeed = P_Value + I_Value + D_Value;
+        LeftMotor_turnspeed = (P_Value + I_Value + D_Value) * ScaleFactor;
+        RightMotor_turnspeed = (P_Value + I_Value + D_Value) * ScaleFactor;
 
         // Clamp motor speeds to max speed limit
         if (LeftMotor_turnspeed > speed) LeftMotor_turnspeed = speed;
@@ -185,18 +191,21 @@ void drive_distance(float target_distance, float speed, float AcceptableError) {
             }
 
         // Apply motor speeds (automatically handles forward & reverse)
-        //left_drive.spin(fwd, LeftMotor_turnspeed, pct);
+        left_drive.spin(fwd, LeftMotor_turnspeed, pct);
         right_drive.spin(fwd, RightMotor_turnspeed, pct);
 
         // Exit if error is within acceptable range
         if (fabs(lateral_error) <= AcceptableError) {
-            left_drive.stop(brake);
-            right_drive.stop(brake);
+            left_drive.stop(hold);
+            right_drive.stop(hold);
+            printf("done\n");
+            fflush(stdout); // Ensure it prints
             break;
+            
         }
 
         prevError = lateral_error;
-        vex::task::sleep(20);  // 20ms delay to prevent CPU overload
+        vex::task::sleep(LoopTime);  // 20ms delay to prevent CPU overload
     }
 }
 
@@ -244,17 +253,27 @@ void NONpid(float distance, float speed){
     right_drive.spinFor(fwd, needed_revs, rev, speed, velocityUnits::pct, true); 
     left_drive.spinFor(fwd, needed_revs, rev, speed, velocityUnits::pct, false);
 }
+
+//360 @75 = 6.5 inches
+//720 @75=13 inches
+//1080 @100 = est. 19.5, real = 20, 12 aceptable error = 12
+
 void autonomous_drive() {
     // Reset the motor position to 0 degrees
-    //set_auton();
-    //drive_distance(360, 10, 2);
+    set_auton();
+    //drive_distance(2824, 100, 3);
+    turn_to_angle(179, 25, 2);
+    
+    //drive_distance(360, 75, 2);
+    //vex::task::sleep(1500);
+    //drive_distance(-2080, 50, 2);
+    
 
-    drive_distance(-300, 50, 2);
-    auton_clamp_engage();
-    vex::task::sleep(1000);
-    drive_distance(-315, 50, 2);
-    auton_run_intake(4);
-    turn_to_angle(90, 25, 2);
-    vex::task intake_task(auton_run_intake_task);
-    drive_distance(400, 25, 2);
+    // auton_clamp_engage();
+    // vex::task::sleep(1000);
+    // drive_distance(-1542, 50, 2);
+    // auton_run_intake(4);
+    // turn_to_angle(90, 25, 2);
+    // vex::task intake_task(auton_run_intake_task);
+    // drive_distance(400, 25, 2);
 }

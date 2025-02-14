@@ -39,9 +39,9 @@ using namespace vex;
 // }
 
 int main() {
-    Competition.autonomous(autonomous_drive);
-    Competition.drivercontrol(manualcontrol);
+    //Competition.autonomous(autonomous_drive);
+    //Competition.drivercontrol(manualcontrol);
     //autonomous_drive();
-    //manualcontrol();
+    manualcontrol();
 
 }

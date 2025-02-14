@@ -6,6 +6,8 @@
 int left_speed = 0;
 int right_speed = 0;
 bool hook_state = false;
+int chain_speed = 80;
+int chain_speed_normal = 75;
 
 #include "vex.h"
 using namespace vex;
@@ -16,9 +18,9 @@ using namespace vex;
 //     int left_speed = Controller.Axis3.position();  // Left joystick for left drive
 
 //     // Spin motors
-//     left_drive.spin(forward, left_speed, rpm);
-//     right_drive.spin(forward, right_speed, rpm);
-// // }
+//     left_drive.spin(forward, left_speed, pct);
+//     right_drive.spin(forward, right_speed, pct);
+// }
 // void tank_drive() {
 //     int right_speed = Controller.Axis2.position(); // Right joystick for right drive
 //     int left_speed = Controller.Axis3.position();  // Left joystick for left drive
@@ -34,23 +36,26 @@ using namespace vex;
 //         right_drive.spin(forward, right_speed, rpm);
 //     }
 // }
-//}
+
+int currentRightSpeed = 0;
+int currentLeftSpeed = 0;
+
+
 void tank_drive() {
     // Read joystick positions
     int targetRightSpeed = Controller.Axis2.position(); // Right joystick for right drive
     int targetLeftSpeed  = Controller.Axis3.position();  // Left joystick for left drive
 
     // Static variables to hold the current motor speeds (persist across function calls)
-    static int currentRightSpeed = 0;
-    static int currentLeftSpeed  = 0;
 
     // Define the step size for deceleration (ramp down)
-    const int rampStep = 15;  // Adjust as needed for a smoother deceleration
+    const int rampStep = 12;  // Adjust as needed for a smoother deceleration
 
     // For the right motor:
     if (targetRightSpeed > currentRightSpeed) {
         // Immediate acceleration
         currentRightSpeed = targetRightSpeed;
+
     } else if (targetRightSpeed < currentRightSpeed) {
         // Gradual deceleration
         currentRightSpeed -= rampStep;
@@ -71,7 +76,7 @@ void tank_drive() {
         }
     }
 
-    int amount = 5;
+    int amount = 5;// minimum speed to have the motor stop completely
         if (fabs(currentRightSpeed) <= amount && fabs(currentLeftSpeed) <= amount) {
         // Stop motors and apply brake
         left_drive.stop(brake);
@@ -79,12 +84,77 @@ void tank_drive() {
     }
 
     // Spin motors with the computed speeds
-    left_drive.spin(forward, currentLeftSpeed, rpm);
-    right_drive.spin(forward, currentRightSpeed, rpm);
+    left_drive.spin(forward, currentLeftSpeed, pct);
+    right_drive.spin(forward, currentRightSpeed, pct);
+    printf("RightPosition: %f\n", currentRightSpeed);
+
 }
+// void tank_drive() {
+//     // Read raw joystick positions (-100 to 100)
+//     int rawRightJoystick = Controller.Axis2.position();
+//     int rawLeftJoystick  = Controller.Axis3.position();
+
+//     // Apply exponential scaling to joystick input
+//     const double exponent = 3.0; // Adjust for sensitivity (higher = more gradual acceleration)
+//     const int maxJoystick = 100; // Joystick range
+//     const int maxMotorSpeed = 100; // Motor speed range
+
+//     // Normalize joystick input (-1 to 1), apply scaling, and restore range (-100 to 100)
+//     int targetRightSpeed = pow(fabs(rawRightJoystick) / maxJoystick, exponent) * maxMotorSpeed;
+//     int targetLeftSpeed = pow(fabs(rawLeftJoystick) / maxJoystick, exponent) * maxMotorSpeed;
+
+//     // Restore correct sign
+//     targetRightSpeed *= (rawRightJoystick < 0) ? -1 : 1;
+//     targetLeftSpeed *= (rawLeftJoystick < 0) ? -1 : 1;
+
+//     // Persistent motor speeds across function calls
+//     static int currentRightSpeed = 0;
+//     static int currentLeftSpeed = 0;
+
+//     const int rampStep = 8;  // Adjusted for smoother transitions
+
+//     // Smooth acceleration & deceleration logic
+//     if (targetRightSpeed > currentRightSpeed) {
+//         currentRightSpeed += rampStep;
+//         if (currentRightSpeed > targetRightSpeed) {
+//             currentRightSpeed = targetRightSpeed;
+//         }
+//     } else if (targetRightSpeed < currentRightSpeed) {
+//         currentRightSpeed -= rampStep;
+//         if (currentRightSpeed < targetRightSpeed) {
+//             currentRightSpeed = targetRightSpeed;
+//         }
+//     }
+
+//     if (targetLeftSpeed > currentLeftSpeed) {
+//         currentLeftSpeed += rampStep;
+//         if (currentLeftSpeed > targetLeftSpeed) {
+//             currentLeftSpeed = targetLeftSpeed;
+//         }
+//     } else if (targetLeftSpeed < currentLeftSpeed) {
+//         currentLeftSpeed -= rampStep;
+//         if (currentLeftSpeed < targetLeftSpeed) {
+//             currentLeftSpeed = targetLeftSpeed;
+//         }
+//     }
+
+//     int amount = 5; // Threshold for stopping motors
+//     if (fabs(currentRightSpeed) <= amount && fabs(currentLeftSpeed) <= amount) {
+//         left_drive.stop(brake);
+//         right_drive.stop(brake);
+//     } else {
+//         left_drive.spin(forward, currentLeftSpeed, pct);
+//         right_drive.spin(forward, currentRightSpeed, pct);
+//     }
+
+//     // Debugging output
+//     printf("Joystick Right: %d, Target Right: %d, Current Right: %d\n", 
+//            rawRightJoystick, targetRightSpeed, currentRightSpeed);
+//     fflush(stdout);
+// }
 
 // Function for toggling the hook
-void hook_start() {
+void clamp_run() {
     static bool hook_state = false;  // Ensure hook state persists
 
     if (Controller.ButtonR1.pressing()) {
@@ -97,23 +167,59 @@ void hook_start() {
         }
     }
 }
+int intake_sense() {
+    int desiredColor = 2;
+    double hue = 0.0;  
+    int color = 0;  
 
-// Function for intake motor control
-void intake_in() { 
-    if (Controller.ButtonY.pressing()) {
-        intake_motor.spin(forward, 60, pct);
-    } else if (Controller.ButtonB.pressing()) {
-        intake_motor.spin(reverse, 60, pct);
-    } else {
-        intake_motor.stop();
+    // Optical.setLight(ledState::on);
+    // Optical.setLightPower(50, percent);
+    // this_thread::sleep_for(50); // Give time for light to stabilize
+
+    // Average multiple readings
+
+    // double hue1 = Optical.hue();
+    // this_thread::sleep_for(10);
+    // double hue2 = Optical.hue();
+    // this_thread::sleep_for(10);
+    // double hue3 = Optical.hue();
+    hue = Optical.hue();
+
+    printf("hue: %f\n", hue);
+
+    if (hue >= 350 && hue <= 15) {
+        color = 1; // Red
+    } else if (hue >= 185 && hue <= 235) {
+        color = 2; // Blue
+    } else{
+        color = 3;//normal
     }
+    //(condition) ? true : false;
+    //(color == desiredColor || color == 3)? chain_speed=chain_speed_normal : chain_speed = 100;
+    if (color == desiredColor) {
+        chain_speed = chain_speed_normal;
+        printf("normal");
+    } else if(color == 3){
+        chain_speed = chain_speed_normal;
+        printf("normal");
+
+    }
+    else {
+        vex::task::sleep(500);
+        chain_speed = 0;
+        vex::task::sleep(100);
+        printf("fast");
+    }
+    return 0;
 }
+
 
 // Function for intake and chain control
 void intakeNchain() {
     if (Controller.ButtonL1.pressing()) {
+        vex::task intakeTask(intake_sense);
         intake_motor.spin(reverse, 100, pct); 
-        chain_motor.spin(reverse, 80, pct);
+        chain_motor.spin(reverse, chain_speed, pct);
     } else if(Controller.ButtonL2.pressing()){
             chain_motor.spin(fwd, 60, pct);
             intake_motor.spin(fwd, 60, pct);
@@ -126,9 +232,12 @@ void intakeNchain() {
 
 void manualcontrol(){
     while (true) {  // Continuous loop
-        tank_drive();      // Drive control
-        hook_start();      // Hook control
+        //tank_drive();      // Drive control
+        // clamp_run();      // Hook control
         intakeNchain();    // Intake and chain control
+
+        //vex::task intake_sense(intake_sense);
+        //intake_sense(1);
         // // drive_distance((32.2*7.42), 25, 1);
         // // turn_to_angle(90, 30, 0.5);    
 
