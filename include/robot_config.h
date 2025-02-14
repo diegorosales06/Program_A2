@@ -28,6 +28,8 @@ extern motor_group left_drive;
 extern motor_group right_drive;
 
 extern digital_out hook;
+extern digital_out arm;
+
 
 extern motor intake_motor;
 

@@ -37,6 +37,7 @@ motor_group left_drive(left_back,left_middle,left_front);
 motor_group right_drive(right_back,right_middle,right_front);
 
 digital_out hook(Brain.ThreeWirePort.A); //piston 
+digital_out arm(Brain.ThreeWirePort.B);
 //vision::signature darkBlue = vision::signature(1, -3911, -3435, -3673,10879, 11421, 11150,2.5, 0);
 
 

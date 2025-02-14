@@ -214,10 +214,24 @@ int intake_sense() {
 }
 
 
+
+void armcontrol(){
+    static bool arm_state = false;
+
+    if (Controller.ButtonR2.pressing()) {
+        arm_state = !arm_state;  // Toggle state
+        arm.set(arm_state);  // Activate or deactivate hook
+
+        // Wait for button release to avoid rapid toggling
+        while (Controller.ButtonR2.pressing()) {
+            vex::task::sleep(20);
+        }
+    }
+}
 // Function for intake and chain control
 void intakeNchain() {
     if (Controller.ButtonL1.pressing()) {
-        vex::task intakeTask(intake_sense);
+
         intake_motor.spin(reverse, 100, pct); 
         chain_motor.spin(reverse, chain_speed, pct);
     } else if(Controller.ButtonL2.pressing()){
@@ -232,14 +246,12 @@ void intakeNchain() {
 
 void manualcontrol(){
     while (true) {  // Continuous loop
-        //tank_drive();      // Drive control
-        // clamp_run();      // Hook control
+        tank_drive();      // Drive control
+        clamp_run();      // Hook control
         intakeNchain();    // Intake and chain control
+        armcontrol();
 
-        //vex::task intake_sense(intake_sense);
-        //intake_sense(1);
-        // // drive_distance((32.2*7.42), 25, 1);
-        // // turn_to_angle(90, 30, 0.5);    
+        //vex::task intake_sense(intake_sense); 
 
 
         vex::task::sleep(20);  // Prevent CPU overload
